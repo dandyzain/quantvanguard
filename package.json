@@ -1,0 +1,31 @@
+{
+  "name": "quantvanguard-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QuantVanguard: Multi-Asset Portfolio Rebalancer, AI Risk Profiler & Macro Stress-Test Simulator",
+  "scripts": {
+    "web:dev": "npm --prefix apps/web run dev",
+    "web:build": "npm --prefix apps/web run build",
+    "web:start": "npm --prefix apps/web run start",
+    "web:lint": "npm --prefix apps/web run lint",
+    "prisma:generate": "npm --prefix apps/web run prisma:generate",
+    "prisma:push": "npm --prefix apps/web run prisma:push",
+    "mobile:run": "cd apps/mobile && flutter run",
+    "mobile:build": "cd apps/mobile && flutter build apk"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "keywords": [
+    "wealthtech",
+    "portfolio-management",
+    "rebalancing",
+    "zero-sell",
+    "macro-simulator",
+    "monte-carlo",
+    "nextjs",
+    "flutter"
+  ],
+  "author": "QuantVanguard Engineering Team",
+  "license": "MIT"
+}

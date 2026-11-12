@@ -1,0 +1,160 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AssetCode {
+  MMF_IDR
+  ETF_VOO
+  GOLD_XAU
+  CRYPTO_BTC
+}
+
+enum StrategyName {
+  DEFENSIVE_LIQUIDITY_FIRST
+  CONSERVATIVE_CAPITAL_PRESERVER
+  BALANCED_LIQUID_CORE
+  GROWTH_ACCUMULATOR
+  AGGRESSIVE_ASYMMETRIC_ALPHA
+}
+
+enum RebalanceMode {
+  FULL
+  ZERO_SELL_INFLOW
+}
+
+model User {
+  id          String        @id @default(uuid())
+  email       String        @unique
+  name        String
+  isDemoUser  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  riskProfile RiskProfile?
+  portfolios  Portfolio[]
+
+  @@map("users")
+}
+
+model RiskProfile {
+  id                     String       @id @default(uuid())
+  userId                 String       @unique
+  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Deterministic 2D scores
+  capacityScore          Decimal      @db.Decimal(5, 2)
+  toleranceScore         Decimal      @db.Decimal(5, 2)
+  strategyName           StrategyName
+  
+  // Detailed deterministic survey inputs
+  emergencyFundMonths    Decimal      @db.Decimal(5, 2)
+  monthlySavingsRatio    Decimal      @db.Decimal(5, 4)
+  investmentHorizonYears Int
+  incomeStabilityScore   Int
+  crashReactionScore     Int
+  volatilityComfortScore Int
+  experienceYears        Int
+  
+  // Guardrail target allocations: { "MMF_IDR": 0.40, "ETF_VOO": 0.20, "GOLD_XAU": 0.20, "CRYPTO_BTC": 0.20 }
+  targetAllocations      Json
+  
+  // Gemini AI synthesis with structured diagnosis
+  geminiDiagnosis        Json
+  
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@map("risk_profiles")
+}
+
+model Portfolio {
+  id              String                @id @default(uuid())
+  userId          String
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name            String                @default("Primary Wealth Portfolio")
+  baseCurrency    String                @default("IDR") // "IDR" or "USD"
+  monthlyExpenses Decimal               @db.Decimal(18, 2) // Living expenses for liquid runway
+  
+  holdings        AssetHolding[]
+  snapshots       HistoricalSnapshot[]
+  rebalanceLogs   RebalanceLog[]
+  stressScenarios MacroStressScenario[]
+
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@map("portfolios")
+}
+
+model AssetHolding {
+  id              String    @id @default(uuid())
+  portfolioId     String
+  portfolio       Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  assetCode       AssetCode
+  units           Decimal   @db.Decimal(24, 8) // Supports 8 decimal places for BTC
+  costBasisPrice  Decimal   @db.Decimal(18, 4) // In base currency (IDR)
+  currentPrice    Decimal   @db.Decimal(18, 4) // In base currency (IDR)
+  currency        String    @default("IDR")
+  
+  lastPriceUpdate DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([portfolioId, assetCode])
+  @@map("asset_holdings")
+}
+
+model HistoricalSnapshot {
+  id             String    @id @default(uuid())
+  portfolioId    String
+  portfolio      Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  snapshotDate   DateTime
+  totalValueIdr  Decimal   @db.Decimal(20, 2)
+  totalCostBasis Decimal   @db.Decimal(20, 2)
+  usdIdrRate     Decimal   @db.Decimal(10, 2)
+  
+  // Detailed holdings snapshot
+  breakdown      Json
+  
+  createdAt      DateTime  @default(now())
+
+  @@index([portfolioId, snapshotDate])
+  @@map("historical_snapshots")
+}
+
+model RebalanceLog {
+  id            String        @id @default(uuid())
+  portfolioId   String
+  portfolio     Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  mode          RebalanceMode
+  inflowAmount  Decimal?      @db.Decimal(18, 2) // null if FULL mode
+  executionPlan Json          // Array of buy/sell actions with units and nominal amounts
+  executedAt    DateTime      @default(now())
+
+  @@map("rebalance_logs")
+}
+
+model MacroStressScenario {
+  id                 String    @id @default(uuid())
+  portfolioId        String
+  portfolio          Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  scenarioName       String    // "2008_GFC", "2020_COVID", "2022_BEAR", "CUSTOM"
+  assetShocks        Json      // { "MMF_IDR": 0.04, "ETF_VOO": -0.38, ... }
+  portfolioDrawdown  Decimal   @db.Decimal(6, 2) // -24.50%
+  postShockValueIdr  Decimal   @db.Decimal(20, 2)
+  liquidRunwayMonths Decimal   @db.Decimal(6, 2)
+  
+  simulatedAt        DateTime  @default(now())
+
+  @@map("macro_stress_scenarios")
+}
